@@ -10,4 +10,9 @@ public class LoginController {
     public String loadLoginPage() {
         return "login";
     }
+
+    @GetMapping(value = {"/admin", "/user"})
+    public String loadMainPage() {
+        return "index";
+    }
 }

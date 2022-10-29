@@ -9,9 +9,7 @@ import ru.kata.spring.boot_security.demo.model.User;
 import ru.kata.spring.boot_security.demo.repository.RoleRepository;
 import ru.kata.spring.boot_security.demo.repository.UserRepository;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,16 +56,20 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void updateUser(User updatedUser, String[] newRoles) {
+    public void saveUser(User newUser) {
+        fixProblemWithRoles(newUser);
+        newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
+        userRepository.save(newUser);
+    }
+
+    @Override
+    @Transactional
+    public void updateUser(User updatedUser) {
+        fixProblemWithRoles(updatedUser);
+
+        //если пароль не менялся, не делает перекодировку
         User oldUser = findUserById(updatedUser.getId());
-
-        Set<Role> newRolesSet = Arrays.stream(newRoles)
-                .map(roleRepository::findRoleByName)
-                .collect(Collectors.toSet());
-
-        updatedUser.setRoles(newRolesSet);
-
-        if (!(passwordEncoder.matches(updatedUser.getPassword(), oldUser.getPassword()))
+        if (!(updatedUser.getPassword().equals(oldUser.getPassword()))
                 && (updatedUser.getPassword() != null)
                 && !(updatedUser.getPassword().equals(""))) {
             updatedUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
@@ -75,5 +77,19 @@ public class UserServiceImpl implements UserService {
             updatedUser.setPassword(oldUser.getPassword());
         }
         userRepository.save(updatedUser);
+    }
+
+/*   У меня ошибка при редактировании пользователя и создании нового пользователя.
+     Когда я сохраняю таких пользователей, в базу добавляются новые роли,
+     с тем же названием, но другим Id,
+     приходится по имени переназначать на те, что уже есть в базе,
+     есть лучше способ решить эту проблему?
+                                                                */
+    private void fixProblemWithRoles(User updatedOrNewUser) {
+        Set<Role> rolesFromDB = new HashSet<>();
+        for (Role role : updatedOrNewUser.getRoles()) {
+            rolesFromDB.add(roleRepository.findRoleByName(role.getName()));
+        }
+        updatedOrNewUser.setRoles(rolesFromDB);
     }
 }
